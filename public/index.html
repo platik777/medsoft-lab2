@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Телеконсультация</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0e14;
+      --surface: #111822;
+      --surface2: #1a2332;
+      --border: #1f2d3d;
+      --accent: #00d4ff;
+      --accent2: #0099bb;
+      --danger: #ff4757;
+      --success: #2ed573;
+      --warn: #ffa502;
+      --text: #e8f4f8;
+      --text2: #7a99b0;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo {
+      font-family: var(--mono);
+      font-size: 15px;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .logo span { color: var(--text2); }
+    #status-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      letter-spacing: 1px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      transition: all .3s;
+    }
+    #status-badge.connected { border-color: var(--success); color: var(--success); }
+    #status-badge.calling { border-color: var(--warn); color: var(--warn); }
+
+    /* LOBBY */
+    #lobby {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 32px;
+      padding: 40px 20px;
+    }
+    .lobby-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 48px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .lobby-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--accent);
+      font-family: var(--mono);
+      letter-spacing: 1px;
+    }
+    .lobby-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-top: -12px;
+    }
+    label {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text2);
+      font-family: var(--mono);
+      display: block;
+      margin-bottom: 6px;
+    }
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 15px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 11px 22px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 600;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { opacity: .85; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+    }
+    .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+    .btn-ghost.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-ghost.muted {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .hint {
+      font-size: 12px;
+      color: var(--text2);
+      text-align: center;
+    }
+    .hint b { color: var(--accent); font-family: var(--mono); }
+
+    /* CALL VIEW */
+    #call-view {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+    #call-view.active { display: flex; }
+
+    .videos-area {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      background: #000;
+      min-height: 0;
+    }
+
+    .video-slot {
+      position: relative;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .video-slot video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .video-label {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,.7);
+      background: rgba(0,0,0,.5);
+      padding: 3px 9px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .video-off-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface2);
+      color: var(--text2);
+      font-size: 48px;
+      font-family: var(--mono);
+    }
+    .video-off-overlay.hidden { display: none; }
+
+    .waiting-message {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text2);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .waiting-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: .2; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    /* CONTROLS */
+    .controls {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .volume-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 90px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .controls-sep {
+      width: 1px;
+      height: 32px;
+      background: var(--border);
+    }
+
+    /* ERROR */
+    #error-msg {
+      display: none;
+      background: rgba(255,71,87,.15);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+    #error-msg.show { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Теле<span>//</span>Консультация</div>
+  <div id="status-badge">OFFLINE</div>
+</header>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="lobby-title">// Подключение</div>
+    <div class="lobby-sub">Введите ID комнаты для входа или создайте новую</div>
+
+    <div>
+      <label for="room-input">ID комнаты</label>
+      <input type="text" id="room-input" placeholder="например: room-42" maxlength="32" />
+      <div id="error-msg"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-primary" id="btn-join" style="flex:1">Войти</button>
+      <button class="btn btn-ghost" id="btn-random">Случайная</button>
+    </div>
+
+    <p class="hint">Комната поддерживает <b>2</b> участника.<br>Второй участник вводит тот же ID.</p>
+  </div>
+</div>
+
+<!-- CALL VIEW -->
+<div id="call-view">
+  <div class="videos-area">
+    <!-- Local -->
+    <div class="video-slot" id="local-slot">
+      <video id="local-video" autoplay muted playsinline></video>
+      <div class="video-off-overlay hidden" id="local-video-off">📷</div>
+      <div class="video-label">ВЫ</div>
+    </div>
+    <!-- Remote -->
+    <div class="video-slot" id="remote-slot">
+      <video id="remote-video" autoplay playsinline></video>
+      <div class="video-off-overlay" id="remote-video-off">
+        <div class="waiting-message">
+          <div class="waiting-dot"></div>
+          <span>Ожидание собеседника...</span>
+        </div>
+      </div>
+      <div class="video-label">СОБЕСЕДНИК</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost active" id="btn-mic" title="Микрофон">🎙 Микрофон</button>
+    <button class="btn btn-ghost active" id="btn-cam" title="Камера">📷 Камера</button>
+
+    <div class="controls-sep"></div>
+
+    <div class="volume-wrapper">
+      <span>🔊</span>
+      <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" />
+      <span id="vol-label">100%</span>
+    </div>
+
+    <div class="controls-sep"></div>
+
+    <button class="btn btn-danger" id="btn-end">✕ Завершить</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // DOM refs
+  const lobby       = document.getElementById('lobby');
+  const callView    = document.getElementById('call-view');
+  const roomInput   = document.getElementById('room-input');
+  const btnJoin     = document.getElementById('btn-join');
+  const btnRandom   = document.getElementById('btn-random');
+  const btnMic      = document.getElementById('btn-mic');
+  const btnCam      = document.getElementById('btn-cam');
+  const btnEnd      = document.getElementById('btn-end');
+  const localVideo  = document.getElementById('local-video');
+  const remoteVideo = document.getElementById('remote-video');
+  const volSlider   = document.getElementById('volume-slider');
+  const volLabel    = document.getElementById('vol-label');
+  const statusBadge = document.getElementById('status-badge');
+  const errorMsg    = document.getElementById('error-msg');
+  const localOff    = document.getElementById('local-video-off');
+  const remoteOff   = document.getElementById('remote-video-off');
+
+  // State
+  let localStream = null;
+  let pc = null;
+  let isInitiator = false;
+  let micEnabled = true;
+  let camEnabled = true;
+
+  const ICE_SERVERS = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+
+  // Socket
+  const socket = io();
+
+  socket.on('room-full', () => showError('Комната заполнена (максимум 2 участника)'));
+
+  socket.on('joined', async ({ isInitiator: init }) => {
+    isInitiator = init;
+    setStatus('ОЖИДАНИЕ', 'calling');
+
+    await startLocalMedia();
+    showCallView();
+
+    if (isInitiator) {
+      await createPeerConnection();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', offer);
+    }
+  });
+
+  socket.on('peer-joined', async () => {
+    if (!isInitiator) {
+      await createPeerConnection();
+    }
+  });
+
+  socket.on('offer', async (offer) => {
+    if (!pc) await createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('answer', answer);
+  });
+
+  socket.on('answer', async (answer) => {
+    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('ice-candidate', async (candidate) => {
+    if (pc && candidate) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+    }
+  });
+
+  socket.on('call-ended', () => {
+    alert('Собеседник завершил конференцию.');
+    endCall(false);
+  });
+
+  // Media
+  async function startLocalMedia() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = localStream;
+    } catch(e) {
+      showError('Нет доступа к камере/микрофону: ' + e.message);
+    }
+  }
+
+  // PeerConnection
+  async function createPeerConnection() {
+    pc = new RTCPeerConnection(ICE_SERVERS);
+
+    // Add local tracks
+    if (localStream) {
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    }
+
+    // Remote stream
+    const remoteStream = new MediaStream();
+    remoteVideo.srcObject = remoteStream;
+
+    pc.ontrack = ({ track }) => {
+      remoteStream.addTrack(track);
+      remoteOff.classList.add('hidden');
+      setStatus('В ЭФИРЕ', 'connected');
+    };
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('ice-candidate', candidate);
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        setStatus('РАЗРЫВ', '');
+      }
+    };
+  }
+
+  // Controls
+  btnMic.addEventListener('click', () => {
+    if (!localStream) return;
+    micEnabled = !micEnabled;
+    localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+    btnMic.textContent = micEnabled ? '🎙 Микрофон' : '🔇 Микрофон';
+    btnMic.className = micEnabled ? 'btn btn-ghost active' : 'btn btn-ghost muted';
+  });
+
+  btnCam.addEventListener('click', () => {
+    if (!localStream) return;
+    camEnabled = !camEnabled;
+    localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+    localOff.classList.toggle('hidden', camEnabled);
+    btnCam.textContent = camEnabled ? '📷 Камера' : '🚫 Камера';
+    btnCam.className = camEnabled ? 'btn btn-ghost active' : 'btn btn-ghost muted';
+  });
+
+  volSlider.addEventListener('input', () => {
+    remoteVideo.volume = parseFloat(volSlider.value);
+    volLabel.textContent = Math.round(volSlider.value * 100) + '%';
+  });
+
+  btnEnd.addEventListener('click', () => {
+    if (confirm('Завершить конференцию?')) {
+      socket.emit('end-call');
+      endCall(true);
+    }
+  });
+
+  // Lobby
+  btnJoin.addEventListener('click', joinRoom);
+  roomInput.addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  btnRandom.addEventListener('click', () => {
+    roomInput.value = 'room-' + Math.random().toString(36).slice(2, 7);
+    joinRoom();
+  });
+
+  function joinRoom() {
+    const id = roomInput.value.trim();
+    if (!id) { showError('Введите ID комнаты'); return; }
+    hideError();
+    socket.emit('join', id);
+  }
+
+  function showCallView() {
+    lobby.style.display = 'none';
+    callView.classList.add('active');
+  }
+
+  function endCall(local) {
+    if (pc) { pc.close(); pc = null; }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    localVideo.srcObject = null;
+    remoteVideo.srcObject = null;
+
+    // Reset UI
+    callView.classList.remove('active');
+    lobby.style.display = '';
+    localOff.classList.add('hidden');
+    remoteOff.classList.remove('hidden');
+    btnMic.textContent = '🎙 Микрофон'; btnMic.className = 'btn btn-ghost active';
+    btnCam.textContent = '📷 Камера'; btnCam.className = 'btn btn-ghost active';
+    micEnabled = true; camEnabled = true;
+    setStatus('OFFLINE', '');
+    roomInput.value = '';
+  }
+
+  // Helpers
+  function setStatus(text, cls) {
+    statusBadge.textContent = text;
+    statusBadge.className = cls ? `connected ${cls}` : '';
+    if (cls === 'connected') { statusBadge.className = 'connected'; }
+    else if (cls === 'calling') { statusBadge.className = 'calling'; }
+  }
+  function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('show'); }
+  function hideError() { errorMsg.classList.remove('show'); }
+</script>
+</body>
+</html>
