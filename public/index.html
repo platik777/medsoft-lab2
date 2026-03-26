@@ -107,7 +107,9 @@
       display: block;
       margin-bottom: 6px;
     }
-    input[type="text"] {
+
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -119,7 +121,11 @@
       outline: none;
       transition: border-color .2s;
     }
-    input[type="text"]:focus { border-color: var(--accent); }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: var(--accent);
+    }
 
     .btn {
       display: inline-flex;
@@ -163,6 +169,21 @@
       text-align: center;
     }
     .hint b { color: var(--accent); font-family: var(--mono); }
+
+    #auth-msg {
+      font-size: 12px;
+      font-family: var(--mono);
+      text-align: center;
+      min-height: 16px;
+    }
+
+    #auth-msg.success {
+      color: var(--success);
+    }
+
+    #auth-msg.error {
+      color: var(--danger);
+    }
 
     /* CALL VIEW */
     #call-view {
@@ -309,14 +330,32 @@
   <div id="status-badge">OFFLINE</div>
 </header>
 
-<div id="auth" style="display:flex;flex-direction:column;gap:10px;max-width:300px;margin:40px auto;">
-  <input id="login" placeholder="Логин" />
-  <input id="password" type="password" placeholder="Пароль" />
+<div id="auth">
+  <div class="lobby-card">
+    <div class="lobby-title">// Авторизация</div>
+    <div class="lobby-sub">Войдите или создайте аккаунт</div>
 
-  <button onclick="register()">Регистрация</button>
-  <button onclick="login()">Войти</button>
+    <div>
+      <label for="auth-login">Логин</label>
+      <input type="text" id="auth-login" placeholder="от 3 до 16 символов" maxlength="16" />
+    </div>
 
-  <div id="auth-msg"></div>
+    <div>
+      <label for="auth-password">Пароль</label>
+      <input type="password" id="auth-password" placeholder="от 10 до 16 символов" maxlength="16" />
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-primary" onclick="login()" style="flex:1">
+        Войти
+      </button>
+      <button class="btn btn-ghost" onclick="register()" style="flex:1">
+        Регистрация
+      </button>
+    </div>
+
+    <div id="auth-msg" class="hint" style="margin-top:10px;"></div>
+  </div>
 </div>
 
 <!-- LOBBY -->
@@ -400,6 +439,8 @@
   const localOff    = document.getElementById('local-video-off');
   const remoteOff   = document.getElementById('remote-video-off');
 
+  lobby.style.display = 'none';
+
   // State
   let localStream = null;
   let pc = null;
@@ -419,8 +460,8 @@
   let socket = null;
 
   async function register() {
-    const login = document.getElementById('login').value;
-    const password = document.getElementById('password').value;
+    const login = document.getElementById('auth-login').value;
+    const password = document.getElementById('auth-password').value;
 
     const res = await fetch('/register', {
       method: 'POST',
@@ -429,13 +470,19 @@
     });
 
     const data = await res.json();
-    document.getElementById('auth-msg').innerText =
-            data.id ? 'Ваш ID: ' + data.id : data.error;
+
+    if (data.id) {
+      showAuthMessage('ID: ' + data.id, 'success');
+      setTimeout(() => showAuthMessage(''), 3000);
+    } else {
+      showAuthMessage(data.error, 'error');
+      setTimeout(() => showAuthMessage(''), 3000);
+    }
   }
 
   async function login() {
-    const login = document.getElementById('login').value;
-    const password = document.getElementById('password').value;
+    const login = document.getElementById('auth-login').value;
+    const password = document.getElementById('auth-password').value;
 
     const res = await fetch('/login', {
       method: 'POST',
@@ -446,20 +493,23 @@
     const data = await res.json();
 
     if (data.token) {
+      showAuthMessage('Успешный вход', 'success');
+      setTimeout(() => showAuthMessage(''), 3000);
+
       token = data.token;
 
       document.getElementById('auth').style.display = 'none';
       lobby.style.display = 'flex';
 
-      // 🔥 ВАЖНО: подключение сокета с токеном
       socket = io({
         auth: { token }
       });
 
-      initSocketHandlers(); // вынеси твой socket.on код сюда
+      initSocketHandlers();
 
     } else {
-      document.getElementById('auth-msg').innerText = data.error;
+      showAuthMessage(data.error, 'error');
+      setTimeout(() => showAuthMessage(''), 3000);
     }
   }
 
@@ -549,6 +599,12 @@
         setStatus('РАЗРЫВ', '');
       }
     };
+  }
+
+  function showAuthMessage(msg, type = 'error') {
+    const el = document.getElementById('auth-msg');
+    el.textContent = msg;
+    el.className = 'hint ' + type;
   }
 
   // Controls
