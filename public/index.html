@@ -309,6 +309,16 @@
   <div id="status-badge">OFFLINE</div>
 </header>
 
+<div id="auth" style="display:flex;flex-direction:column;gap:10px;max-width:300px;margin:40px auto;">
+  <input id="login" placeholder="Логин" />
+  <input id="password" type="password" placeholder="Пароль" />
+
+  <button onclick="register()">Регистрация</button>
+  <button onclick="login()">Войти</button>
+
+  <div id="auth-msg"></div>
+</div>
+
 <!-- LOBBY -->
 <div id="lobby">
   <div class="lobby-card">
@@ -405,53 +415,101 @@
   };
 
   // Socket
-  const socket = io();
+  let token = null;
+  let socket = null;
 
-  socket.on('room-full', () => showError('Комната заполнена (максимум 2 участника)'));
+  async function register() {
+    const login = document.getElementById('login').value;
+    const password = document.getElementById('password').value;
 
-  socket.on('joined', async ({ isInitiator: init }) => {
-    isInitiator = init;
-    setStatus('ОЖИДАНИЕ', 'calling');
+    const res = await fetch('/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ login, password })
+    });
 
-    await startLocalMedia();
-    showCallView();
+    const data = await res.json();
+    document.getElementById('auth-msg').innerText =
+            data.id ? 'Ваш ID: ' + data.id : data.error;
+  }
 
-    if (isInitiator) {
-      await createPeerConnection();
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('offer', offer);
+  async function login() {
+    const login = document.getElementById('login').value;
+    const password = document.getElementById('password').value;
+
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ login, password })
+    });
+
+    const data = await res.json();
+
+    if (data.token) {
+      token = data.token;
+
+      document.getElementById('auth').style.display = 'none';
+      lobby.style.display = 'flex';
+
+      // 🔥 ВАЖНО: подключение сокета с токеном
+      socket = io({
+        auth: { token }
+      });
+
+      initSocketHandlers(); // вынеси твой socket.on код сюда
+
+    } else {
+      document.getElementById('auth-msg').innerText = data.error;
     }
-  });
+  }
 
-  socket.on('peer-joined', async () => {
-    if (!isInitiator) {
-      await createPeerConnection();
-    }
-  });
+  function initSocketHandlers() {
+    socket.on('room-full', () => showError('Комната заполнена (максимум 2 участника)'));
 
-  socket.on('offer', async (offer) => {
-    if (!pc) await createPeerConnection();
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('answer', answer);
-  });
+    socket.on('joined', async ({ isInitiator: init }) => {
+      isInitiator = init;
+      setStatus('ОЖИДАНИЕ', 'calling');
 
-  socket.on('answer', async (answer) => {
-    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-  });
+      await startLocalMedia();
+      showCallView();
 
-  socket.on('ice-candidate', async (candidate) => {
-    if (pc && candidate) {
-      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
-    }
-  });
+      if (isInitiator) {
+        await createPeerConnection();
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('offer', offer);
+      }
+    });
 
-  socket.on('call-ended', () => {
-    alert('Собеседник завершил конференцию.');
-    endCall(false);
-  });
+    socket.on('peer-joined', async () => {
+      if (!isInitiator) {
+        await createPeerConnection();
+      }
+    });
+
+    socket.on('offer', async (offer) => {
+      if (!pc) await createPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', answer);
+    });
+
+    socket.on('answer', async (answer) => {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on('ice-candidate', async (candidate) => {
+      if (pc && candidate) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+      }
+    });
+
+    socket.on('call-ended', () => {
+      alert('Собеседник завершил конференцию.');
+      endCall(false);
+    });
+  }
 
   // Media
   async function startLocalMedia() {
